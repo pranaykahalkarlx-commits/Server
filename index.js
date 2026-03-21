@@ -1,22 +1,15 @@
 const express = require('express');
 const cors = require('cors');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// In-memory OTP store: { email: { otp, expiresAt } }
-const otpStore = {};
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Configure your email sender (Gmail example)
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,     // your Gmail address
-    pass: process.env.EMAIL_PASS      // Gmail App Password (not your login password)
-  }
-});
+// In-memory OTP store
+const otpStore = {};
 
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -28,22 +21,27 @@ app.post('/api/auth/send-otp', async (req, res) => {
   if (!email) return res.json({ success: false, message: 'Email is required' });
 
   const otp = generateOTP();
-  otpStore[email] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 }; // 10 min expiry
+  otpStore[email] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 };
 
   try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+    await resend.emails.send({
+      from: 'AI Receptionist <onboarding@resend.dev>',
       to: email,
       subject: 'Your AI Receptionist Login Code',
       html: `
-        <h2>Your verification code</h2>
-        <p style="font-size:32px;font-weight:bold;letter-spacing:8px">${otp}</p>
-        <p>This code expires in 10 minutes.</p>
+        <div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:32px;background:#f8f9ff;border-radius:16px">
+          <h2 style="color:#5b5ef4;margin-bottom:8px">AI Receptionist</h2>
+          <p style="color:#7077a1;margin-bottom:24px">Your verification code:</p>
+          <div style="font-size:40px;font-weight:800;letter-spacing:12px;color:#1e2240;background:#fff;padding:20px;border-radius:12px;text-align:center;border:1px solid rgba(99,102,241,.2)">
+            ${otp}
+          </div>
+          <p style="color:#7077a1;font-size:13px;margin-top:20px">This code expires in 10 minutes. Do not share it with anyone.</p>
+        </div>
       `
     });
     res.json({ success: true, message: 'OTP sent' });
   } catch (err) {
-    console.error('Email error:', err.message);
+    console.error('Resend error:', err.message);
     res.json({ success: false, message: 'Failed to send email: ' + err.message });
   }
 });
@@ -61,7 +59,7 @@ app.post('/api/auth/verify-otp', (req, res) => {
   }
   if (record.otp !== otp) return res.json({ success: false, message: 'Invalid code. Try again.' });
 
-  delete otpStore[email]; // one-time use
+  delete otpStore[email];
   res.json({ success: true, message: 'Verified' });
 });
 
@@ -69,3 +67,10 @@ app.get('/', (req, res) => res.send('AI Receptionist Backend Running'));
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+```
+
+## Railway Environment Variables
+
+In Railway → your service → **Variables**, add just one:
+```
+RESEND_API_KEY=re_GJjQJrPp_A1Gk58Fa27PF3iBK97SRjQzF
