@@ -1,29 +1,5 @@
-[phases.setup]
-nixPkgs = ["nodejs_18"]
-
 [phases.install]
 cmds = ["npm install"]
 
-[phases.build]
-cmds = []
-
 [start]
 cmd = "node index.js"
-```
-
-**OR** the simpler fix — add a `Procfile` to your repo:
-
-**`Procfile`**
-```
-web: node index.js
-```
-
----
-
-## Your repo should have exactly these 4 files:
-```
-your-repo/
-├── index.js
-├── package.json
-├── nixpacks.toml    ← add this
-└── Procfile         ← add this too
